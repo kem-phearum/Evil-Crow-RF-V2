@@ -1,0 +1,148 @@
+# ==========================================
+# PlatformIO
+# ==========================================
+.pio/
+.platformio/
+*.egg-info/
+dist/
+build/
+
+# ==========================================
+# VS Code
+# ==========================================
+.vscode/
+.vscode/.browse.c_cpp.db*
+.vscode/c_cpp_properties.json
+.vscode/launch.json
+.vscode/ipch
+.vscode/extensions.json
+*.code-workspace
+
+# ==========================================
+# IDE & Editor
+# ==========================================
+.idea/
+.sublime-project
+.sublime-workspace
+*.swp
+*.swo
+*~
+*.bak
+.DS_Store
+Thumbs.db
+
+# ==========================================
+# Build & Compilation Artifacts
+# ==========================================
+*.o
+*.a
+*.so
+*.elf
+*.bin
+*.map
+*.out
+*.exe
+*.com
+*.class
+*.jar
+*.pyc
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.coverage
+
+# ==========================================
+# Firmware & Binary Files (Generated)
+# ==========================================
+firmware.bin
+firmware.elf
+bootloader.bin
+partitions.bin
+*.spiffs.bin
+*.hex
+
+# ==========================================
+# Dependencies
+# ==========================================
+node_modules/
+venv/
+env/
+ENV/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ==========================================
+# Environment & Configuration (Secrets)
+# ==========================================
+.env
+.env.local
+.env.*.local
+secrets.txt
+API_KEYS.txt
+config.local.json
+
+# ==========================================
+# OS & System Files
+# ==========================================
+.DS_Store
+.AppleDouble
+.LSOverride
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# ==========================================
+# Logs & Temp Files
+# ==========================================
+*.log
+logs/
+*.tmp
+*.temp
+*.cache
+*.bak
+*.backup
+~*
+
+# ==========================================
+# SerialPort & Monitor Files
+# ==========================================
+*.ser
+seriallog*.txt
+port.log
+
+# ==========================================
+# MicroSD Card Content (ALL INCLUDED)
+# ==========================================
+# Note: Entire SD/ folder is tracked including:
+# - SD/HTML/       (Web interface files)
+# - SD/CONFIG/     (Configuration files)
+# - SD/SUBGHZ/     (RF signal library)
+
+# ==========================================
+# Documentation Build
+# ==========================================
+docs/_build/
+site/
+.mkdocs.yml.bak
+
+# ==========================================
+# Testing & Coverage
+# ==========================================
+.coverage
+htmlcov/
+.pytest_cache/
+.hypothesis/
+*.cover
+
+# ==========================================
+# Misc
+# ==========================================
+*.tar.gz
+*.zip
+*.rar
+.directory
