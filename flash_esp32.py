@@ -23,6 +23,7 @@ Usage:
 import sys
 import subprocess
 import argparse
+import shutil
 from pathlib import Path
 from datetime import datetime
 
@@ -64,7 +65,7 @@ class ESP32Flasher:
             self.log(desc)
         self.log(f"Running: {' '.join(cmd)}")
         try:
-            result = subprocess.run(cmd, cwd=self.project_root)
+            result = subprocess.run(cmd, cwd=self.project_root, text=True)
             return result.returncode == 0
         except Exception as e:
             self.log(str(e), "ERROR")
@@ -92,7 +93,11 @@ class ESP32Flasher:
     def find_merged_bin(self):
         if not self.build_dir.exists():
             return None
-        merged = list(self.build_dir.glob("*.merged.bin"))
+        merged = sorted(
+            self.build_dir.glob("*.merged.bin"),
+            key=lambda p: p.stat().st_mtime,
+            reverse=True
+        )
         return merged[0] if merged else None
 
     # -----------------------------------------------------
@@ -120,13 +125,17 @@ class ESP32Flasher:
             self.log("No serial port specified", "ERROR")
             return False
 
-        return self.run_cmd([
+        if not self.run_cmd([
             "python", "-m", "esptool",
             "--no-stub",
             "--port", self.port,
             "--baud", str(self.baud),
             "chip-id"
-        ], "Performing ESP32 sanity check")
+        ], "Performing ESP32 sanity check"):
+            self.log("TROUBLESHOOTING: Try holding BOOT button while plugging USB", "INFO")
+            return False
+        
+        return True
 
     # -----------------------------------------------------
     # Build
@@ -134,6 +143,12 @@ class ESP32Flasher:
 
     def build(self):
         self.log("Building firmware with PlatformIO...")
+        
+        if not shutil.which("platformio"):
+            self.log("PlatformIO not found in PATH", "ERROR")
+            self.log("Install: pip install platformio", "INFO")
+            return False
+        
         if not self.run_cmd(
             ["platformio", "run", "-e", "esp32dev"],
             "PlatformIO build"
@@ -168,6 +183,7 @@ class ESP32Flasher:
             return False
 
         self.log(f"Recovery flashing merged firmware: {self.merged_bin.name}")
+        self.log("(Recovery flash does NOT erase flash)", "INFO")
         return self.run_cmd([
             "python", "-m", "esptool",
             "--no-stub",
