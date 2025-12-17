@@ -1,21 +1,21 @@
 #include "ELECHOUSE_CC1101_SRC_DRV.h"
-#include <SPI.h>
-#include <ESPmDNS.h>
-#include <WiFiClient.h> 
-#include <WiFi.h>
-#include <AsyncTCP.h>
-#include <ESPAsyncWebServer.h>
-#include <WiFiAP.h>
-#include <LittleFS.h>
 #include "SD.h"
 #include <Arduino.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
+#include <ESPmDNS.h>
+#include <LittleFS.h>
+#include <SPI.h>
+#include <WiFi.h>
+#include <WiFiAP.h>
+#include <WiFiClient.h>
 
 // ==========================================
 // FORWARD DECLARATIONS
 // ==========================================
-String readFile(fs::FS &fs, const char * path);
-void appendFile(fs::FS &fs, const char * path, const char * message);
-void deleteFile(fs::FS &fs, const char * path);
+String readFile(fs::FS &fs, const char *path);
+void appendFile(fs::FS &fs, const char *path, const char *message);
+void deleteFile(fs::FS &fs, const char *path);
 void enableReceive();
 void receiver();
 bool checkReceived();
@@ -24,15 +24,15 @@ void signalanalyse();
 // ==========================================
 
 // Default Fallbacks (used if SD card fails)
-String configSSID = "Evil Crow RF v2"; 
+String configSSID = "Evil Crow RF v2";
 String configPASS = "123456789ECRFv2";
-String configMODE = "AP"; 
+String configMODE = "AP";
 
 // MicroSD slot pins
 #define SD_SCLK 18
 #define SD_MISO 19
 #define SD_MOSI 23
-#define SD_SS   22
+#define SD_SS 22
 SPIClass sdspi(VSPI);
 
 // SPI Pins
@@ -58,7 +58,7 @@ const int minsample = 30;
 unsigned long sample[samplesize];
 unsigned long samplesmooth[samplesize];
 String lastSampleSmooth;
-int  lastIndex;
+int lastIndex;
 int samplecount;
 static unsigned long lastTime = 0;
 int mod;
@@ -67,7 +67,7 @@ int datarate;
 float frequency;
 float setrxbw;
 int power_jammer;
-byte jammer[] = { 0xff, 0xff };
+byte jammer[] = {0xff, 0xff};
 const size_t jammer_len = sizeof(jammer) / sizeof(jammer[0]);
 long data_to_send[2000];
 
@@ -93,10 +93,12 @@ AsyncWebServer controlserver(80);
 // ==========================================
 // HELPER: Read File Content as String
 // ==========================================
-String readFile(fs::FS &fs, const char * path) {
-  if (!fs.exists(path)) return "";
+String readFile(fs::FS &fs, const char *path) {
+  if (!fs.exists(path))
+    return "";
   File file = fs.open(path);
-  if (!file) return "";
+  if (!file)
+    return "";
   String payload = file.readString();
   payload.trim(); // Remove spaces/newlines
   file.close();
@@ -112,9 +114,12 @@ void loadConfig() {
   String p = readFile(SD, "/CONFIG/PASS.txt");
   String m = readFile(SD, "/CONFIG/MODE.txt");
 
-  if (s.length() > 0) configSSID = s;
-  if (p.length() > 0) configPASS = p;
-  if (m.length() > 0) configMODE = m;
+  if (s.length() > 0)
+    configSSID = s;
+  if (p.length() > 0)
+    configPASS = p;
+  if (m.length() > 0)
+    configMODE = m;
 }
 
 void connectToWiFi() {
@@ -123,12 +128,12 @@ void connectToWiFi() {
   if (configMODE == "AP") {
     // --- ACCESS POINT MODE ---
     WiFi.mode(WIFI_AP);
-    
+
     // Check if password is valid for WPA2 (min 8 chars)
     if (configPASS.length() < 8) {
-       WiFi.softAP(configSSID.c_str()); // Open Network
+      WiFi.softAP(configSSID.c_str()); // Open Network
     } else {
-       WiFi.softAP(configSSID.c_str(), configPASS.c_str());
+      WiFi.softAP(configSSID.c_str(), configPASS.c_str());
     }
 
     // Force IP to 192.168.4.1
@@ -136,16 +141,17 @@ void connectToWiFi() {
     IPAddress gateway(192, 168, 4, 1);
     IPAddress subnet(255, 255, 255, 0);
     WiFi.softAPConfig(local_IP, gateway, subnet);
-    
+
   } else {
     // --- STATION MODE (Connect to Router/Hotspot) ---
     WiFi.mode(WIFI_STA);
     WiFi.begin(configSSID.c_str(), configPASS.c_str());
-    
+
     unsigned long start = millis();
     while (WiFi.status() != WL_CONNECTED) {
       delay(500);
-      if (millis() - start > 15000) break; // Timeout
+      if (millis() - start > 15000)
+        break; // Timeout
     }
   }
 }
@@ -180,27 +186,33 @@ void handleStats(AsyncWebServerRequest *request) {
   json += ",\"sdcard_present\":" + String(sd_present ? "true" : "false");
   json += ",\"totalram\":" + String(ESP.getHeapSize());
   json += ",\"freeram\":" + String(ESP.getFreeHeap());
-  
+
   // Dynamic Info
   json += ",\"mode\":\"" + configMODE + "\"";
-  json += ",\"ssid\":\"" + (configMODE == "AP" ? configSSID : WiFi.SSID()) + "\"";
-  json += ",\"ipaddress\":\"" + (configMODE == "AP" ? WiFi.softAPIP().toString() : WiFi.localIP().toString()) + "\"";
-  
+  json +=
+      ",\"ssid\":\"" + (configMODE == "AP" ? configSSID : WiFi.SSID()) + "\"";
+  json += ",\"ipaddress\":\"" +
+          (configMODE == "AP" ? WiFi.softAPIP().toString()
+                              : WiFi.localIP().toString()) +
+          "\"";
+  json += ",\"rx_active\":" + String(raw_rx == "1" ? "true" : "false");
+  json += ",\"tx_active\":" + String(jammer_tx == "1" ? "true" : "false");
+  json += ",\"current_freq\":" + String(frequency);
+
   json += "}";
 
   request->send(200, "application/json", json);
 }
 
-void appendFile(fs::FS &fs, const char * path, const char * message){
+void appendFile(fs::FS &fs, const char *path, const char *message) {
   logs = fs.open(path, FILE_APPEND);
-  if(!logs) return;
+  if (!logs)
+    return;
   logs.print(message);
   logs.close();
 }
 
-void deleteFile(fs::FS &fs, const char * path){
-  fs.remove(path);
-}
+void deleteFile(fs::FS &fs, const char *path) { fs.remove(path); }
 
 bool checkReceived(void) {
   delay(1);
@@ -215,7 +227,8 @@ bool checkReceived(void) {
 
 void printReceived() {
   OutputLog = "";
-  appendFile(SD, "/logs.txt", "-------------------------------------------------------\n");
+  appendFile(SD, "/logs.txt",
+             "-------------------------------------------------------\n");
   OutputLog += "\nCount=" + String(samplecount) + "\n";
 
   for (int i = 0; i < samplecount; i++) {
@@ -240,17 +253,18 @@ void RECEIVE_ATTR receiver() {
   if (samplecount >= samplesize) {
     samplecount = samplesize - 1;
     bool received = checkReceived();
-    if (received) {}
+    if (received) {
+    }
     detachInterrupt(rx_pin1);
     detachInterrupt(rx_pin2);
   }
 
   if (mod == 0) {
-    if (samplecount == 1 and digitalRead(rx_pin2) != HIGH){
+    if (samplecount == 1 and digitalRead(rx_pin2) != HIGH) {
       samplecount = 0;
     }
 
-    else if (samplecount == 1 and digitalRead(rx_pin1) != HIGH){
+    else if (samplecount == 1 and digitalRead(rx_pin1) != HIGH) {
       samplecount = 0;
     }
   }
@@ -258,108 +272,113 @@ void RECEIVE_ATTR receiver() {
   lastTime = time;
 }
 
-void signalanalyse(){
+void signalanalyse() {
   OutputLog = "";
-  #define signalstorage 10
+#define signalstorage 10
 
-  int signalanz=0;
+  int signalanz = 0;
   int timingdelay[signalstorage];
-  long signaltimings[signalstorage*2];
+  long signaltimings[signalstorage * 2];
   int signaltimingscount[signalstorage];
   long signaltimingssum[signalstorage];
-  long signalsum=0;
-  
-  for (int i = 0; i<signalstorage; i++){
-    signaltimings[i*2] = 100000;
-    signaltimings[i*2+1] = 0;
+  long signalsum = 0;
+
+  for (int i = 0; i < signalstorage; i++) {
+    signaltimings[i * 2] = 100000;
+    signaltimings[i * 2 + 1] = 0;
     signaltimingscount[i] = 0;
     signaltimingssum[i] = 0;
   }
-  for (int i = 1; i<samplecount; i++){
-    signalsum+=sample[i];
+  for (int i = 1; i < samplecount; i++) {
+    signalsum += sample[i];
   }
 
-  for (int p = 0; p<signalstorage; p++){
+  for (int p = 0; p < signalstorage; p++) {
 
-  for (int i = 1; i<samplecount; i++){
-    if (p==0){
-      if (sample[i]<signaltimings[p*2]){
-        signaltimings[p*2]=sample[i];
+    for (int i = 1; i < samplecount; i++) {
+      if (p == 0) {
+        if (sample[i] < signaltimings[p * 2]) {
+          signaltimings[p * 2] = sample[i];
+        }
+      } else {
+        if (sample[i] < signaltimings[p * 2] &&
+            sample[i] > signaltimings[p * 2 - 1]) {
+          signaltimings[p * 2] = sample[i];
+        }
       }
-    }else{
-      if (sample[i]<signaltimings[p*2] && sample[i]>signaltimings[p*2-1]){
-        signaltimings[p*2]=sample[i];
+    }
+
+    for (int i = 1; i < samplecount; i++) {
+      if (sample[i] < signaltimings[p * 2] + error_toleranz &&
+          sample[i] > signaltimings[p * 2 + 1]) {
+        signaltimings[p * 2 + 1] = sample[i];
       }
     }
-  }
 
-  for (int i = 1; i<samplecount; i++){
-    if (sample[i]<signaltimings[p*2]+error_toleranz && sample[i]>signaltimings[p*2+1]){
-      signaltimings[p*2+1]=sample[i];
+    for (int i = 1; i < samplecount; i++) {
+      if (sample[i] >= signaltimings[p * 2] &&
+          sample[i] <= signaltimings[p * 2 + 1]) {
+        signaltimingscount[p]++;
+        signaltimingssum[p] += sample[i];
+      }
     }
-  }
-
-  for (int i = 1; i<samplecount; i++){
-    if (sample[i]>=signaltimings[p*2] && sample[i]<=signaltimings[p*2+1]){
-      signaltimingscount[p]++;
-      signaltimingssum[p]+=sample[i];
-    }
-  }
   }
   int firstsample = signaltimings[0];
-  signalanz=signalstorage;
+  signalanz = signalstorage;
 
-  for (int i = 0; i<signalstorage; i++){
-    if (signaltimingscount[i] == 0){
-      signalanz=i;
-      i=signalstorage;
+  for (int i = 0; i < signalstorage; i++) {
+    if (signaltimingscount[i] == 0) {
+      signalanz = i;
+      i = signalstorage;
     }
   }
 
-  for (int s=1; s<signalanz; s++){
-  for (int i=0; i<signalanz-s; i++){
-    if (signaltimingscount[i] < signaltimingscount[i+1]){
-      int temp1 = signaltimings[i*2];
-      int temp2 = signaltimings[i*2+1];
-      int temp3 = signaltimingssum[i];
-      int temp4 = signaltimingscount[i];
-      signaltimings[i*2] = signaltimings[(i+1)*2];
-      signaltimings[i*2+1] = signaltimings[(i+1)*2+1];
-      signaltimingssum[i] = signaltimingssum[i+1];
-      signaltimingscount[i] = signaltimingscount[i+1];
-      signaltimings[(i+1)*2] = temp1;
-      signaltimings[(i+1)*2+1] = temp2;
-      signaltimingssum[i+1] = temp3;
-      signaltimingscount[i+1] = temp4;
+  for (int s = 1; s < signalanz; s++) {
+    for (int i = 0; i < signalanz - s; i++) {
+      if (signaltimingscount[i] < signaltimingscount[i + 1]) {
+        int temp1 = signaltimings[i * 2];
+        int temp2 = signaltimings[i * 2 + 1];
+        int temp3 = signaltimingssum[i];
+        int temp4 = signaltimingscount[i];
+        signaltimings[i * 2] = signaltimings[(i + 1) * 2];
+        signaltimings[i * 2 + 1] = signaltimings[(i + 1) * 2 + 1];
+        signaltimingssum[i] = signaltimingssum[i + 1];
+        signaltimingscount[i] = signaltimingscount[i + 1];
+        signaltimings[(i + 1) * 2] = temp1;
+        signaltimings[(i + 1) * 2 + 1] = temp2;
+        signaltimingssum[i + 1] = temp3;
+        signaltimingscount[i + 1] = temp4;
+      }
     }
   }
+
+  for (int i = 0; i < signalanz; i++) {
+    timingdelay[i] = signaltimingssum[i] / signaltimingscount[i];
   }
 
-  for (int i=0; i<signalanz; i++){
-    timingdelay[i] = signaltimingssum[i]/signaltimingscount[i];
-  }
-
-  if (firstsample == sample[1] and firstsample < timingdelay[0]){
+  if (firstsample == sample[1] and firstsample < timingdelay[0]) {
     sample[1] = timingdelay[0];
   }
 
-  bool lastbin=0;
-  for (int i=1; i<samplecount; i++){
-    float r = (float)sample[i]/timingdelay[0];
+  bool lastbin = 0;
+  for (int i = 1; i < samplecount; i++) {
+    float r = (float)sample[i] / timingdelay[0];
     int calculate = r;
-    r = r-calculate;
-    r*=10;
-    if (r>=5){calculate+=1;}
-    if (calculate>0){
-      if (lastbin==0){
-        lastbin=1;
-      }else{
-      lastbin=0;
+    r = r - calculate;
+    r *= 10;
+    if (r >= 5) {
+      calculate += 1;
     }
-      if (lastbin==0 && calculate>8){
+    if (calculate > 0) {
+      if (lastbin == 0) {
+        lastbin = 1;
+      } else {
+        lastbin = 0;
+      }
+      if (lastbin == 0 && calculate > 8) {
         OutputLog += " [Pause: " + String(sample[i]) + " samples]\n";
-      } else{
-        for (int b=0; b<calculate; b++){
+      } else {
+        for (int b = 0; b < calculate; b++) {
           OutputLog += String(lastbin);
         }
       }
@@ -367,16 +386,18 @@ void signalanalyse(){
   }
   OutputLog += "\nSamples/Symbol: " + String(timingdelay[0]) + "\n\n";
 
-  int smoothcount=0;
+  int smoothcount = 0;
 
-  for (int i=1; i<samplecount; i++){
-    float r = (float)sample[i]/timingdelay[0];
+  for (int i = 1; i < samplecount; i++) {
+    float r = (float)sample[i] / timingdelay[0];
     int calculate = r;
-    r = r-calculate;
-    r*=10;
-    if (r>=5){calculate+=1;}
-    if (calculate>0){
-      samplesmooth[smoothcount] = calculate*timingdelay[0];
+    r = r - calculate;
+    r *= 10;
+    if (r >= 5) {
+      calculate += 1;
+    }
+    if (calculate > 0) {
+      samplesmooth[smoothcount] = calculate * timingdelay[0];
       smoothcount++;
     }
   }
@@ -386,11 +407,12 @@ void signalanalyse(){
 
   OutputLog += "Rawdata corrected:\nCount=" + String(smoothcount + 1) + "\n";
 
-  for (int i=0; i<smoothcount; i++){
+  for (int i = 0; i < smoothcount; i++) {
     OutputLog += String(samplesmooth[i]) + ",";
   }
   appendFile(SD, "/logs.txt", OutputLog.c_str());
-  appendFile(SD, "/logs.txt", "\n-------------------------------------------------------\n");
+  appendFile(SD, "/logs.txt",
+             "\n-------------------------------------------------------\n");
   return;
 }
 
@@ -431,11 +453,11 @@ void setup() {
     request->send(SD, "/HTML/rxconfig.html", "text/html");
   });
 
-  controlserver.on("/viewlog", HTTP_GET, [](AsyncWebServerRequest *request){
+  controlserver.on("/viewlog", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(SD, "/HTML/viewlog.html", "text/html");
   });
 
-  controlserver.on("/logs", HTTP_GET, [](AsyncWebServerRequest *request){
+  controlserver.on("/logs", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(SD, "/logs.txt", "text/plain");
   });
 
@@ -443,37 +465,42 @@ void setup() {
     request->send(SD, "/HTML/txconfig.html", "text/html");
   });
 
-  controlserver.on("/delete", HTTP_POST, [](AsyncWebServerRequest *request){
+  controlserver.on("/delete", HTTP_POST, [](AsyncWebServerRequest *request) {
     deleteFile(SD, "/logs.txt");
     request->send(200, "application/json", "{\"status\":\"deleted\"}");
   });
 
-  controlserver.on("/config", HTTP_GET, [](AsyncWebServerRequest *request){
+  controlserver.on("/config", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(SD, "/HTML/config.html", "text/html");
   });
 
   controlserver.on("/stats", HTTP_GET, handleStats);
 
-  controlserver.on("/reboot", HTTP_POST, [](AsyncWebServerRequest *request){
-    request->send(200, "application/json", "{\"success\":true,\"message\":\"Device rebooting\"}");
+  controlserver.on("/reboot", HTTP_POST, [](AsyncWebServerRequest *request) {
+    request->send(200, "application/json",
+                  "{\"success\":true,\"message\":\"Device rebooting\"}");
     delay(200);
     ESP.restart();
   });
 
-  controlserver.on("/connectioncheck", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "application/json", "{\"status\":\"ok\"}");
-  });
+  controlserver.on(
+      "/connectioncheck", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(200, "application/json", "{\"status\":\"ok\"}");
+      });
 
-  controlserver.on("/javascript.js", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(SD, "/HTML/javascript.js", "text/javascript");
-  });
+  controlserver.on(
+      "/javascript.js", HTTP_GET, [](AsyncWebServerRequest *request) {
+        request->send(SD, "/HTML/javascript.js", "text/javascript");
+      });
 
   controlserver.on("/setrx", HTTP_POST, [](AsyncWebServerRequest *request) {
     if (!request->hasArg("module") || !request->hasArg("frequency") ||
-      !request->hasArg("setrxbw") || !request->hasArg("mod") ||
-      !request->hasArg("deviation") || !request->hasArg("datarate")) {
+        !request->hasArg("setrxbw") || !request->hasArg("mod") ||
+        !request->hasArg("deviation") || !request->hasArg("datarate")) {
 
-      request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing parameters\"}");
+      request->send(
+          400, "application/json",
+          "{\"status\":\"error\",\"message\":\"Missing parameters\"}");
       return;
     }
 
@@ -514,9 +541,13 @@ void setup() {
       ELECHOUSE_cc1101.setDRate(datarate);
       enableReceive();
       raw_rx = "1";
-      request->send(200, "application/json", "{\"status\":\"success\",\"message\":\"RX configuration applied successfully.\"}");
+      request->send(200, "application/json",
+                    "{\"status\":\"success\",\"message\":\"RX configuration "
+                    "applied successfully.\"}");
     } else {
-      request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing configmodule parameter\"}");
+      request->send(400, "application/json",
+                    "{\"status\":\"error\",\"message\":\"Missing configmodule "
+                    "parameter\"}");
     }
   });
 
@@ -527,12 +558,14 @@ void setup() {
     ELECHOUSE_cc1101.setSidle();
 
     raw_rx = "0";
-    request->send(200, "application/json", "{\"status\":\"success\",\"message\":\"RX stopped.\"}");
+    request->send(200, "application/json",
+                  "{\"status\":\"success\",\"message\":\"RX stopped.\"}");
   });
 
-  controlserver.on("/settx", HTTP_POST, [](AsyncWebServerRequest *request){
-    if (!request->hasArg("module") || !request->hasArg("frequency") || 
-      !request->hasArg("rawdata") || !request->hasArg("mod") || !request->hasArg("deviation")) {
+  controlserver.on("/settx", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!request->hasArg("module") || !request->hasArg("frequency") ||
+        !request->hasArg("rawdata") || !request->hasArg("mod") ||
+        !request->hasArg("deviation")) {
       request->send(400, "text/plain", "Missing parameters");
       return;
     }
@@ -549,13 +582,14 @@ void setup() {
     deviation = tmp_deviation.toFloat();
     mod = tmp_mod.toInt();
 
-    for (int i = 0; i < transmit.length(); i++){
-      if (transmit.substring(i, i+1) == ",") {
+    for (int i = 0; i < transmit.length(); i++) {
+      if (transmit.substring(i, i + 1) == ",") {
         data_to_send[counter++] = transmit.substring(pos, i).toInt();
-        pos = i+1;
+        pos = i + 1;
       }
     }
-    if (pos < transmit.length()) data_to_send[counter++] = transmit.substring(pos).toInt();
+    if (pos < transmit.length())
+      data_to_send[counter++] = transmit.substring(pos).toInt();
 
     int tx_pin = (tmp_module == "1") ? 2 : 25;
     ELECHOUSE_cc1101.setModul((tmp_module == "1") ? 0 : 1);
@@ -570,17 +604,19 @@ void setup() {
       digitalWrite(tx_pin, HIGH);
       delayMicroseconds(data_to_send[i]);
       digitalWrite(tx_pin, LOW);
-      delayMicroseconds(data_to_send[i+1]);
+      delayMicroseconds(data_to_send[i + 1]);
     }
 
     ELECHOUSE_cc1101.setSidle();
     request->send(200, "text/plain", "Signal has been transmitted");
-});
+  });
 
-
-  controlserver.on("/setjammer", HTTP_POST, [](AsyncWebServerRequest *request){
-    if (!request->hasArg("module") || !request->hasArg("frequency") || !request->hasArg("power")) {
-      request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Missing parameters (module, frequency, power required)\"}");
+  controlserver.on("/setjammer", HTTP_POST, [](AsyncWebServerRequest *request) {
+    if (!request->hasArg("module") || !request->hasArg("frequency") ||
+        !request->hasArg("power")) {
+      request->send(400, "application/json",
+                    "{\"status\":\"error\",\"message\":\"Missing parameters "
+                    "(module, frequency, power required)\"}");
       return;
     }
 
@@ -589,7 +625,9 @@ void setup() {
     int power_jammer = request->arg("power").toInt();
 
     if (tmp_module != "1" && tmp_module != "2") {
-      request->send(400, "application/json", "{\"status\":\"error\",\"message\":\"Invalid module (must be 1 or 2)\"}");
+      request->send(400, "application/json",
+                    "{\"status\":\"error\",\"message\":\"Invalid module (must "
+                    "be 1 or 2)\"}");
       return;
     }
 
@@ -605,18 +643,69 @@ void setup() {
     ELECHOUSE_cc1101.SetTx();
 
     jammer_tx = "1";
-    request->send(200, "application/json", "{\"status\":\"success\",\"message\":\"Jammer started\"}");
+    request->send(200, "application/json",
+                  "{\"status\":\"success\",\"message\":\"Jammer started\"}");
   });
 
-  controlserver.on("/stopjammer", HTTP_POST, [](AsyncWebServerRequest *request) {
-    ELECHOUSE_cc1101.setModul(0);
-    ELECHOUSE_cc1101.setSidle();
-    ELECHOUSE_cc1101.setModul(1);
-    ELECHOUSE_cc1101.setSidle();
+  controlserver.on(
+      "/stopjammer", HTTP_POST, [](AsyncWebServerRequest *request) {
+        ELECHOUSE_cc1101.setModul(0);
+        ELECHOUSE_cc1101.setSidle();
+        ELECHOUSE_cc1101.setModul(1);
+        ELECHOUSE_cc1101.setSidle();
 
-    jammer_tx = "0";
-    request->send(200, "application/json", "{\"status\":\"success\",\"message\":\"Jammer stopped\"}");
-  });
+        jammer_tx = "0";
+        request->send(
+            200, "application/json",
+            "{\"status\":\"success\",\"message\":\"Jammer stopped\"}");
+      });
+
+  // --- NEW WIFI CONFIGURATION ENDPOINTS ---
+  controlserver.on(
+      "/updatewifi", HTTP_POST, [](AsyncWebServerRequest *request) {
+        if (!request->hasArg("ssid") || !request->hasArg("password")) {
+          request->send(400, "application/json",
+                        "{\"status\":\"error\",\"message\":\"Missing SSID or "
+                        "password\"}");
+          return;
+        }
+
+        String ssid = request->arg("ssid");
+        String pass = request->arg("password");
+
+        // Basic validation
+        if (ssid.length() == 0 || pass.length() < 8) {
+          request->send(400, "application/json",
+                        "{\"status\":\"error\",\"message\":\"Invalid input. "
+                        "Password must be >= 8 chars.\"}");
+          return;
+        }
+
+        // Save to SD Card
+        deleteFile(SD, "/CONFIG/SSID.txt");
+        deleteFile(SD, "/CONFIG/PASS.txt");
+        appendFile(SD, "/CONFIG/SSID.txt", ssid.c_str());
+        appendFile(SD, "/CONFIG/PASS.txt", pass.c_str());
+
+        // Update runtime config (optional, takes effect next boot usually)
+        configSSID = ssid;
+        configPASS = pass;
+
+        request->send(200, "application/json",
+                      "{\"status\":\"success\",\"message\":\"Wi-Fi settings "
+                      "saved. Reboot to apply.\"}");
+      });
+
+  controlserver.on(
+      "/deletewificonfig", HTTP_POST, [](AsyncWebServerRequest *request) {
+        deleteFile(SD, "/CONFIG/SSID.txt");
+        deleteFile(SD, "/CONFIG/PASS.txt");
+        // Optionally reset runtime config to defaults
+        request->send(
+            200, "application/json",
+            "{\"status\":\"success\",\"message\":\"Wi-Fi config deleted. "
+            "Device will revert to default AP on reboot.\"}");
+      });
 
   controlserver.on("/style.css", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(SD, "/HTML/style.css", "text/css");
@@ -625,34 +714,33 @@ void setup() {
   controlserver.begin();
   ELECHOUSE_cc1101.addSpiPin(sck_pin, miso_pin, mosi_pin, cs_pin1, 0);
   ELECHOUSE_cc1101.addSpiPin(sck_pin, miso_pin, mosi_pin, cs_pin2, 1);
-  
+
   enableReceive();
 }
 
 void loop() {
-  if(raw_rx == "1") {
-    if(checkReceived()){
+  if (raw_rx == "1") {
+    if (checkReceived()) {
       printReceived();
       signalanalyse();
       enableReceive();
       delay(700);
     }
   }
-  if(jammer_tx == "1") {
+  if (jammer_tx == "1") {
     if (tmp_module == "1") {
-      for (int i = 0; i + 1 < jammer_len; i += 2){
-        digitalWrite(tx_pin1,HIGH);
+      for (int i = 0; i + 1 < jammer_len; i += 2) {
+        digitalWrite(tx_pin1, HIGH);
         delayMicroseconds(jammer[i]);
-        digitalWrite(tx_pin1,LOW);
-        delayMicroseconds(jammer[i+1]);
+        digitalWrite(tx_pin1, LOW);
+        delayMicroseconds(jammer[i + 1]);
       }
-    }
-    else if (tmp_module == "2") {
-      for (int i = 0; i + 1 < jammer_len; i += 2){
-        digitalWrite(tx_pin2,HIGH);
+    } else if (tmp_module == "2") {
+      for (int i = 0; i + 1 < jammer_len; i += 2) {
+        digitalWrite(tx_pin2, HIGH);
         delayMicroseconds(jammer[i]);
-        digitalWrite(tx_pin2,LOW);
-        delayMicroseconds(jammer[i+1]);
+        digitalWrite(tx_pin2, LOW);
+        delayMicroseconds(jammer[i + 1]);
       }
     }
   }

@@ -1,102 +1,114 @@
-<!DOCTYPE HTML>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <title>EvilCrow-RF</title>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <title>Evil Crow RF V2</title>
     <link rel="stylesheet" href="style.css">
-    <script src="javascript.js"></script>
+    <script src="javascript.js" defer></script>
 </head>
 <body>
-    <div id="global-toast" class="toast-container"></div>
-    <nav id="menu">
-        <input type="checkbox" id="responsive-menu">
-        <label for="responsive-menu"></label>
-        <ul>
-            <li><a href="/">Home</a></li>
-            <li><a href="/rxconfig">RX Config</a></li>
-            <li><a href="/viewlog">Log Viewer</a></li>
-            <li><a href="/txconfig">TX Config</a></li>
-            <li><a href="/config">Config</a></li>
+    <header>
+        <div class="nav-container">
+            <div class="brand">
+                <span>⚡</span> EVIL CROW RF
+            </div>
+            <button class="mobile-menu-toggle" id="menuToggle">☰</button>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="/" class="nav-link active">Dashboard</a></li>
+                <li><a href="/rxconfig" class="nav-link">RX Config</a></li>
+                <li><a href="/txconfig" class="nav-link">TX Config</a></li>
+                <li><a href="/viewlog" class="nav-link">Logs</a></li>
+                <li><a href="/config" class="nav-link">Settings</a></li>
+            </ul>
+        </div>
+    </header>
 
-        </ul>
-        </nav>
+    <main class="main-content">
+        <!-- Status Card -->
+        <div class="dashboard-grid">
+            <div class="card glass-panel full-width">
+                <div class="card-header">System Overview</div>
+                <div class="stat-row">
+                    <span class="stat-label">Firmware</span>
+                    <span class="stat-value" id="firmware">v2.0-mod</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Connection</span>
+                    <span class="stat-value" id="connection-status">Checking...</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Uptime</span>
+                    <span class="stat-value" id="uptime">--:--:--</span>
+                </div>
+            </div>
 
-    <div class="rf-logo">EvilCrow-RF</div>
+            <!-- Hardware Stats -->
+            <div class="card glass-panel">
+                <div class="card-header">Hardware Monitor</div>
+                <div class="stat-row">
+                    <span class="stat-label">CPU Temp</span>
+                    <span class="stat-value" id="temperature">-- °C</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Core 0 Freq</span>
+                    <span class="stat-value" id="cpu0">-- MHz</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Core 1 Freq</span>
+                    <span class="stat-value" id="cpu1">-- MHz</span>
+                </div>
+            </div>
 
-    <div class="view-container">
-        <div class="stat-container">
-            <div class="stat-group">
-                <strong>Connection Status: <span class="status-indicator status-offline"></span></strong>
+            <!-- Memory Stats -->
+            <div class="card glass-panel">
+                <div class="card-header">Memory</div>
+                <div class="stat-row">
+                    <span class="stat-label">Total RAM</span>
+                    <span class="stat-value" id="totalram">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Free RAM</span>
+                    <span class="stat-value" id="freeram">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">SPIFFS</span>
+                    <span class="stat-value" id="freespiffs">--</span>
+                </div>
             </div>
-            <div class="stat-group">
-                <strong>Firmware:</strong> <span id="firmware">v1.0</span>
+
+            <!-- Network Stats -->
+            <div class="card glass-panel">
+                <div class="card-header">Network</div>
+                <div class="stat-row">
+                    <span class="stat-label">SSID</span>
+                    <span class="stat-value" id="ssid">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">IP Address</span>
+                    <span class="stat-value" id="ipaddress">--</span>
+                </div>
             </div>
-            <div class="stat-group">
-                <strong>Connected to:</strong> <span id="ssid">N/A</span>
-            </div>
-            <div class="stat-group">
-                <strong>IP Address:</strong> <span id="ipaddress">N/A</span>
-            </div>
-            <div class="stat-group">
-                <strong>Uptime:</strong> <span id="uptime">N/A</span>
-            </div>
-            <div class="stat-group">
-                <strong>CPU Temperature:</strong> <span id="temperature">N/A</span>
-            </div>
-            <div class="stat-group">
-                <strong>CPU Core 0 Frequency:</strong> <span id="cpu0">N/A</span>
-            </div>
-            <div class="stat-group">
-                <strong>CPU Core 1 Frequency:</strong> <span id="cpu1">N/A</span>
-            </div>
-            
-            <div class="section-header">MicroSD Storage</div>
-            
-            <div class="stat-group">
-                <strong>SD Card Present:</strong> <span id="sdcard_present">No</span>
-            </div>
-            <div class="stat-group">
-                <strong>SD Card Total Size:</strong> <span id="sdcard_size_gb">N/A</span>
-            </div>
-            <div class="stat-group">
-                <strong>SD Card Free Space:</strong> <span id="sdcard_free_gb">N/A</span>
-            </div>
-         
-            <div class="section-header">Memory Information</div>
-            
-            <div class="stat-group">
-                <strong>Free SPIFFS Memory:</strong> <span id="freespiffs">N/A</span>
-            </div>
-            <div class="stat-group">
-                <strong>Total RAM:</strong> <span id="totalram">N/A</span>
-            </div>
-            <div class="stat-group">
-                <strong>Free RAM:</strong> <span id="freeram">N/A</span>
+
+             <!-- Storage Stats -->
+             <div class="card glass-panel">
+                <div class="card-header">SD Storage</div>
+                <div class="stat-row">
+                    <span class="stat-label">SD Card</span>
+                    <span class="stat-value" id="sdcard_present">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Total Size</span>
+                    <span class="stat-value" id="sdcard_size_gb">--</span>
+                </div>
+                <div class="stat-row">
+                    <span class="stat-label">Free Space</span>
+                    <span class="stat-value" id="sdcard_free_gb">--</span>
+                </div>
             </div>
         </div>
-    </div>
+    </main>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            
-            if (typeof setupNavigation === 'function') {
-                setupNavigation();
-            }
-            
-            if (typeof checkConnection === 'function') {
-                checkConnection();
-            }
-            
-            if (typeof checkConnection === 'function') {
-                setInterval(checkConnection, 5000);
-            }
-            
-            isNavigating = false;
-            document.body.classList.remove('page-loading');
-        });
-    </script>
+    <div id="toast-container" class="toast-container"></div>
 </body>
 </html>

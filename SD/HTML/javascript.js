@@ -1,225 +1,168 @@
-// Track navigation state and abort controller globally
-let isNavigating = false;
-let abortControllers = [];
-let navigationTimeout = null;
-const isHomePage = window.location.pathname === '/' || window.location.pathname === '/index.html';
-let lastConnectionCheck = 0;
+// Modern JS for Evil Crow RF V2
+'use strict';
 
-function checkConnection() {
-    const now = Date.now();
-    if (now - lastConnectionCheck < 2000) return;
-    lastConnectionCheck = now;
+const UI = {
+    elements: {
+        menuToggle: document.getElementById('menuToggle'),
+        navLinks: document.getElementById('navLinks'),
+        toastContainer: document.getElementById('toast-container'),
+        indicators: document.querySelectorAll('.status-value')
+    },
 
-    if (isNavigating) {
-        abortAllRequests();
-        return;
-    }
+    init() {
+        this.setupNavigation();
+        this.startPolling();
+        console.log('Evil Crow RF UI Initialized');
+    },
 
-    const controller = new AbortController();
-    abortControllers.push(controller);
-
-    const timeout = setTimeout(() => controller.abort(), 1500);
-
-    fetch(isHomePage ? '/stats' : '/connectioncheck', { 
-        signal: controller.signal 
-    })
-    .then(response => {
-        clearTimeout(timeout);
-        if (isNavigating) return;
-        if (isHomePage) {
-            return response.json().then(data => {
-                updateStats(data);
+    setupNavigation() {
+        if (this.elements.menuToggle) {
+            this.elements.menuToggle.addEventListener('click', () => {
+                this.elements.navLinks.classList.toggle('show');
+                this.elements.menuToggle.textContent =
+                    this.elements.navLinks.classList.contains('show') ? '✕' : '☰';
             });
+        }
+
+        // Highlight active link
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.nav-link').forEach(link => {
+            if (link.getAttribute('href') === currentPath) {
+                link.classList.add('active');
+            }
+        });
+    },
+
+    showToast(message, type = 'info') {
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        toast.innerHTML = `
+      <span>${message}</span>
+      <span style="cursor:pointer; margin-left:10px" onclick="this.parentElement.remove()">✕</span>
+    `;
+
+        if (!this.elements.toastContainer) {
+            console.error("Toast container missing");
+            return;
+        }
+
+        this.elements.toastContainer.appendChild(toast);
+
+        // Auto remove
+        setTimeout(() => {
+            toast.style.opacity = '0';
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => toast.remove(), 300);
+        }, 4000);
+    },
+
+    async startPolling() {
+        // Poll on ALL pages to show status alerts
+        const poll = async () => {
+            try {
+                const response = await fetch('/stats');
+                if (response.ok) {
+                    const data = await response.json();
+                    this.updateStats(data);
+                    this.updateConnectionStatus(true);
+                } else {
+                    throw new Error('Network response was not ok');
+                }
+            } catch (error) {
+                this.updateConnectionStatus(false);
+            }
+            setTimeout(poll, 2000);
+        };
+        poll();
+    },
+
+    updateConnectionStatus(online) {
+        const el = document.getElementById('connection-status');
+        if (el) {
+            el.textContent = online ? 'Online' : 'Offline';
+            el.className = `stat-value ${online ? 'ok' : 'err'}`;
+        }
+    },
+
+    updateStats(data) {
+        const set = (id, val) => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = val;
+        };
+
+        set('uptime', this.formatUptime(data.uptime));
+        set('cpu0', `${data.cpu0} MHz`);
+        set('cpu1', `${data.cpu1} MHz`);
+        set('temperature', `${data.temperature?.toFixed(1)} °C`);
+        set('totalram', this.formatBytes(data.totalram));
+        set('freeram', this.formatBytes(data.freeram));
+        set('freespiffs', this.formatBytes(data.freespiffs));
+        set('ssid', data.ssid || 'N/A');
+        set('ipaddress', data.ipaddress || 'N/A');
+
+        // Storage
+        set('sdcard_present', data.sdcard_present ? 'Yes' : 'No');
+        set('sdcard_size_gb', `${data.sdcard_size_gb || 0} GB`);
+        set('sdcard_free_gb', `${data.sdcard_free_gb || 0} GB`);
+
+        // Handle Status Alerts
+        if (data.rx_active || data.tx_active) {
+            this.showStatusBanner(data.rx_active, data.tx_active, data.current_freq);
         } else {
-            updateConnectionStatus(response.ok);
-            return response.json();
+            this.hideStatusBanner();
         }
-    })
-    .catch(error => {
-        clearTimeout(timeout);
-        if (error.name !== 'AbortError' && !isNavigating) {
-            updateConnectionStatus(false);
-            if (isHomePage) {
-                document.getElementById('uptime').innerText = 'N/A';
-                document.getElementById('cpu0').innerText = 'N/A';
-                document.getElementById('cpu1').innerText = 'N/A';
-                document.getElementById('temperature').innerText = 'N/A';
-                document.getElementById('freespiffs').innerText = 'N/A';
-                document.getElementById('totalram').innerText = 'N/A';
-                document.getElementById('freeram').innerText = 'N/A';
-                document.getElementById('ssid').innerText = 'N/A';
-                document.getElementById('ipaddress').innerText = 'N/A';
-                document.getElementById('sdcard_present').innerText = 'No';
-                document.getElementById('sdcard_size_gb').innerText = 'N/A';
-                document.getElementById('sdcard_free_gb').innerText = 'N/A';
-            }
-        }
-    });
-}
+    },
 
-function abortAllRequests() {
-    abortControllers.forEach(controller => controller.abort());
-    abortControllers = [];
-}
-
-function setupNavigation() {
-    const links = document.querySelectorAll("#menu a");
-
-    links.forEach(link => {
-        link.addEventListener('click', function(e) {
-            if (this.classList.contains('active')) {
-                e.preventDefault();
-                return;
-            }
-
-            isNavigating = true;
-            abortAllRequests();
-            document.body.classList.add('page-loading');
-
-            if (/iPad|iPhone|iPod/.test(navigator.userAgent)) {
-                e.preventDefault();
-                setTimeout(() => {
-                    window.location.replace(this.href);
-                }, 50);
+    showStatusBanner(rx, tx, freq) {
+        let banner = document.getElementById('status-banner');
+        if (!banner) {
+            banner = document.createElement('div');
+            banner.id = 'status-banner';
+            // Insert after header
+            const header = document.querySelector('header');
+            if (header && header.nextSibling) {
+                header.parentNode.insertBefore(banner, header.nextSibling);
             } else {
-                setTimeout(() => {
-                    window.location.href = this.href;
-                }, 100);
+                document.body.prepend(banner);
             }
-        });
-    });
-
-    const currentPath = window.location.pathname;
-    links.forEach(link => {
-        if (link.getAttribute('href') === currentPath) {
-            link.classList.add('active');
-        } else {
-            link.classList.remove('active');
         }
-    });
-}
 
-window.addEventListener('load', () => {
-    isNavigating = false;
-    document.body.classList.remove('page-loading');
-});
+        // Update class and text only if changed to avoid flicker
+        const newClass = 'status-banner ' + (tx ? 'tx' : 'rx');
 
-function updateConnectionStatus(isOnline) {
-    document.querySelectorAll('.status-indicator').forEach(indicator => {
-        indicator.classList.toggle('status-online', isOnline);
-        indicator.classList.toggle('status-offline', !isOnline);
-    });
-
-    if (window.location.pathname !== '/') {
-        document.querySelectorAll('.rf-logo').forEach(title => {
-            title.classList.toggle('online', isOnline);
-            title.classList.toggle('offline', !isOnline);
-        });
-    }
-}
-
-function updateStats(data) {
-    if (data.uptime) document.getElementById('uptime').innerText = formatUptime(data.uptime);
-    if (data.cpu0) document.getElementById('cpu0').innerText = data.cpu0 + ' MHz';
-    if (data.cpu1) document.getElementById('cpu1').innerText = data.cpu1 + ' MHz';
-    if (data.temperature) document.getElementById('temperature').innerText = data.temperature.toFixed(1) + ' °C';
-    if (data.freespiffs) document.getElementById('freespiffs').innerText = formatBytes(data.freespiffs);
-    if (data.totalram) document.getElementById('totalram').innerText = formatBytes(data.totalram);
-    if (data.freeram) document.getElementById('freeram').innerText = formatBytes(data.freeram);
-    if (data.ssid) document.getElementById('ssid').innerText = data.ssid;
-    if (data.ipaddress) document.getElementById('ipaddress').innerText = data.ipaddress;
-    if (data.sdcard_present !== undefined) {
-        document.getElementById('sdcard_present').innerText = data.sdcard_present ? 'Yes' : 'No';
-    }
-    if (data.sdcard_size_gb) document.getElementById('sdcard_size_gb').innerText = data.sdcard_size_gb + ' GB';
-    if (data.sdcard_free_gb) document.getElementById('sdcard_free_gb').innerText = data.sdcard_free_gb + ' GB';
-
-    updateConnectionStatus(true);
-}
-
-function formatBytes(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-function formatUptime(seconds) {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    
-    if (days > 0) return `${days}d ${hours}h ${minutes}m ${secs}s`;
-    else if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
-    else if (minutes > 0) return `${minutes}m ${secs}s`;
-    else return `${secs}s`;
-}
-
-function showMessage(type, text) {
-    const container = document.getElementById('global-toast') || document.createElement('div');
-    if (!container.id) {
-        container.id = 'global-toast';
-        container.className = 'toast-container';
-        document.body.appendChild(container);
-    }
-    
-    const toast = document.createElement('div');
-    toast.className = `toast-message ${type}`;
-    
-    const messageSpan = document.createElement('span');
-    messageSpan.textContent = text;
-    
-    const closeButton = document.createElement('span');
-    closeButton.className = 'toast-close';
-    closeButton.innerHTML = '&times;';
-    closeButton.onclick = () => {
-        toast.style.animation = 'toastFadeOut 0.3s ease-out';
-        setTimeout(() => toast.remove(), 300);
-    };
-    
-    toast.appendChild(messageSpan);
-    toast.appendChild(closeButton);
-    container.appendChild(toast);
-    
-    const timer = setTimeout(() => {
-        toast.style.animation = 'toastFadeOut 0.3s ease-out';
-        setTimeout(() => toast.remove(), 300);
-    }, 5000);
-    
-    closeButton.onclick = () => {
-        clearTimeout(timer);
-        toast.style.animation = 'toastFadeOut 0.3s ease-out';
-        setTimeout(() => toast.remove(), 300);
-    };
-}
-
-document.addEventListener('touchstart', function(event) {
-    if (event.touches.length > 1) event.preventDefault();
-}, { passive: false });
-
-document.addEventListener('gesturestart', function(e) {
-    e.preventDefault();
-});
-
-document.addEventListener("DOMContentLoaded", function () {
-    console.log('EvilCrow RF - Initializing...');
-    setupNavigation();
-    isNavigating = false;
-    document.body.classList.remove('page-loading');
-    setInterval(checkConnection, 5000);
-    checkConnection();
-    console.log('EvilCrow RF - Initialization complete');
-});
-
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    setTimeout(() => {
-        if (typeof setupNavigation === 'function') setupNavigation();
-        if (typeof checkConnection === 'function') {
-            setInterval(checkConnection, 5000);
-            checkConnection();
+        let statusText = tx ? 'TRANSMISSION ACTIVE' : 'RECEIVING SIGNAL...';
+        if (freq && parseFloat(freq) > 0) {
+            statusText += ` (${parseFloat(freq).toFixed(2)} MHz)`;
         }
-    }, 100);
-}
+        if (tx) statusText = '⚠️ ' + statusText + ' ⚠️';
+        else statusText = '● ' + statusText;
 
+        if (banner.className !== newClass) banner.className = newClass;
+        if (banner.textContent !== statusText) banner.textContent = statusText;
+    },
+
+    hideStatusBanner() {
+        const banner = document.getElementById('status-banner');
+        if (banner) banner.remove();
+    },
+
+    formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    },
+
+    formatUptime(seconds) {
+        if (!seconds) return '--';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        return `${h}h ${m}m ${s}s`;
+    }
+};
+
+window.showMessage = (type, msg) => UI.showToast(msg, type);
+
+document.addEventListener('DOMContentLoaded', () => UI.init());

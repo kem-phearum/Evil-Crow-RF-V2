@@ -1,61 +1,64 @@
-<!DOCTYPE HTML>
-<html>
+<!DOCTYPE html>
+<html lang="en">
+
 <head>
-  <title>EvilCrow-RF</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <title>Evil Crow RF V2 - Config</title>
   <link rel="stylesheet" href="style.css">
-  <script src="javascript.js"></script>
+  <script src="javascript.js" defer></script>
 </head>
 
 <body>
-  <div id="global-toast" class="toast-container"></div>
-
-  <!-- Menu -->
-  <nav id='menu'>
-    <input type='checkbox' id='responsive-menu'><label for='responsive-menu'></label>
-    <ul>
-      <li><a href="/"><span class="usb-icon"></span>Home</a></li>
-      <li><a href="/rxconfig">RX Config</a></li>
-      <li><a href="/viewlog">Log Viewer</a></li>
-      <li><a href="/txconfig">TX Config</a></li>
-      <li><a href="/config">Config</a></li>
-    </ul>
-  </nav>
-
-  <div class="rf-logo">CONFIGURATION</div>
-
-  <div class="view-container">
-
-    <!-- Wi-Fi Config -->
-    <form id="wifiForm">
-      <div class="section-header">WIFI</div>
-
-      <div class="form-group">
-        <label for="ssid">Wi-Fi SSID:</label>
-        <input type="text" id="ssid" name="ssid" required class="terminal-style single-line-input">
+  <header>
+    <div class="nav-container">
+      <div class="brand">
+        <span>⚡</span> EVIL CROW RF
       </div>
-
-      <div class="form-group">
-        <label for="password">Wi-Fi Password:</label>
-        <input type="password" id="password" name="password" required class="terminal-style single-line-input">
-      </div>
-
-      <button type="button" onclick="applyWiFi()">Apply Wi-Fi</button>
-      <button type="button" name="deleteWifiButton" onclick="deleteWiFiConfig()">Delete Wi-Fi Config</button>
-    </form>
-
-    <hr>
-
-    <div class="config-buttons-container">
-      <button type="button" name="clearCacheButton" onclick="clearCache()">Clear Device Cache</button>
-      <button type="button" name="rebootDeviceButton" onclick="rebootDevice()">Reboot Device</button>
+      <button class="mobile-menu-toggle" id="menuToggle">☰</button>
+      <ul class="nav-links" id="navLinks">
+        <li><a href="/" class="nav-link">Dashboard</a></li>
+        <li><a href="/rxconfig" class="nav-link">RX Config</a></li>
+        <li><a href="/txconfig" class="nav-link">TX Config</a></li>
+        <li><a href="/viewlog" class="nav-link">Logs</a></li>
+        <li><a href="/config" class="nav-link active">Settings</a></li>
+      </ul>
     </div>
+  </header>
 
-    <p class="payload-desc">Reload of CSS/JS files.</p>
-  </div>
+  <main class="main-content">
+    <div class="card glass-panel">
+      <div class="card-header">System Configuration</div>
+
+      <form id="wifiForm" onsubmit="event.preventDefault(); applyWiFi();">
+        <h3>Wi-Fi Settings</h3>
+        <div class="form-group">
+          <label for="ssid">SSID</label>
+          <input type="text" id="ssid" name="ssid" required placeholder="Network Name">
+        </div>
+
+        <div class="form-group">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" required placeholder="Network Password">
+        </div>
+
+        <div class="btn-group">
+          <button type="submit" class="btn">Save Wi-Fi</button>
+          <button type="button" class="btn btn-danger" onclick="deleteWiFiConfig()">Reset Wi-Fi</button>
+        </div>
+      </form>
+
+      <hr style="border-color: var(--glass-border); margin: 2rem 0;">
+
+      <h3>Device Actions</h3>
+      <div class="btn-group">
+        <button type="button" class="btn" onclick="clearCache()">Clear Cache</button>
+        <button type="button" class="btn btn-danger" onclick="rebootDevice()">Reboot Device</button>
+      </div>
+    </div>
+  </main>
+
+  <div id="toast-container" class="toast-container"></div>
 
   <script>
     function applyWiFi() {
@@ -63,7 +66,7 @@
       const password = document.getElementById('password').value.trim();
 
       if (!ssid || !password) {
-        showMessage('error', 'SSID and password are required');
+        UI.showToast('SSID and password required', 'error');
         return;
       }
 
@@ -72,65 +75,36 @@
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ ssid, password })
       })
-      .then(response => response.json())
-      .then(data => {
-        if (data.status === 'success') {
-          showMessage('success', data.message);
-        } else {
-          showMessage('error', data.message);
-        }
-      })
-      .catch(error => {
-        showMessage('error', 'Error applying Wi-Fi settings');
-        console.error('Error:', error);
-      });
+        .then(r => r.json())
+        .then(data => UI.showToast(data.message, data.status === 'success' ? 'success' : 'error'))
+        .catch(() => UI.showToast('Connection failed', 'error'));
     }
 
     function deleteWiFiConfig() {
-      if (confirm('Are you sure you want to delete the Wi-Fi configuration?')) {
-        fetch('/deletewificonfig', { method: 'POST' })
-          .then(response => response.json())
-          .then(data => {
-            if (data.status === 'success') {
-              showMessage('success', data.message || 'Wi-Fi configuration deleted!');
-            } else {
-              showMessage('error', data.message || 'Error deleting Wi-Fi config');
-            }
-          })
-          .catch(error => {
-            showMessage('error', 'Error deleting Wi-Fi configuration: ' + error.message);
-          });
-      }
-    }
-
-    function clearCache() {
-      const links = document.querySelectorAll('link[rel="stylesheet"], script[src]');
-      links.forEach(link => {
-        const url = new URL(link.href || link.src);
-        url.searchParams.set('nocache', Date.now());
-        link.href = url.toString();
-      });
-      showMessage('success', 'Cache cleared! Refreshing...');
-      setTimeout(() => location.reload(true), 1000);
+      if (!confirm('Delete Wi-Fi config?')) return;
+      fetch('/deletewificonfig', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => UI.showToast(data.message, 'success'))
+        .catch(() => UI.showToast('Failed to delete config', 'error'));
     }
 
     function rebootDevice() {
-      if (confirm('Are you sure you want to reboot the device?')) {
-        showMessage('info', 'Device rebooting... Please wait');
-        fetch('/reboot', { method: 'POST' }).catch(() => {
-          console.log('Evil Crow RF is rebooting, ignoring fetch error');
-        });
-      }
+      if (!confirm('Reboot device?')) return;
+      fetch('/reboot', { method: 'POST' });
+      UI.showToast('Rebooting...', 'warning');
     }
 
-    function showMessage(type, text) {
-      const container = document.getElementById('global-toast');
-      const toast = document.createElement('div');
-      toast.className = `toast-message ${type}`;
-      toast.textContent = text;
-      container.appendChild(toast);
-      setTimeout(() => toast.remove(), 4000);
+    function clearCache() {
+      // Cache clearing logic is usually browser-side for this simple implementation
+      // Just force reload with cache busting
+      if ('caches' in window) {
+        caches.keys().then((names) => {
+          names.forEach(name => caches.delete(name));
+        });
+      }
+      window.location.reload(true);
     }
   </script>
 </body>
+
 </html>
