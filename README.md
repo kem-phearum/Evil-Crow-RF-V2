@@ -223,16 +223,44 @@ PlatformIO is the modern, recommended approach for Evil Crow RF V2 development w
 3. Monitor the build output in the integrated terminal
 4. Build should complete successfully with no errors
 
-**Step 5: Upload Firmware to Device**
+**Step 5: Flash Firmware to Device**
+
+There are two methods to flash your ESP32:
+
+**Method A: Automated Flashing (PlatformIO-Compatible – Recommended)**
+
+Use the built-in `flash_esp32.py` script to **build and flash the firmware exactly the same way as PlatformIO**  
+(`platformio run -e esp32dev -t upload`), without needing the VS Code UI.
+
+This is the **recommended flashing method** for Evil Crow RF V2.
+
+---
+
+### Usage
+
+```bash
+# Build + flash (recommended)
+python flash_esp32.py
+
+# Build firmware only (no flashing)
+python flash_esp32.py --build-only
+
+# Specify serial port manually
+python flash_esp32.py --port COM3
+
+
+**Method B: Manual Flashing via PlatformIO (VS Code)**
+
 1. Connect your ESP32 device via USB cable
 2. Click the **PlatformIO: Upload** button in the bottom status bar (right arrow icon)
    - Or use terminal: `platformio run --environment esp32dev --target upload`
 3. Monitor the upload progress in the terminal
-4. When complete, you'll see "Uploading" finished message
+4. When complete, you'll see "Upload finished" message
 
 **Step 6: Monitor Serial Output**
 1. Click the **PlatformIO: Monitor** button in the bottom status bar (plug icon)
    - Or use terminal: `platformio device monitor --baud 115200`
+   - Or use the script: `python flash_esp32.py --monitor`
 2. Serial output will display in the integrated terminal
 3. You'll see boot messages and initialization logs
 4. This helps verify the device is working correctly
