@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """
-Evil Crow RF V2 - PlatformIO-Compatible Flash Script
+Evil Crow RF V2 – PlatformIO-Compatible Flash Script
 
-This script mimics:
+Mimics:
+    platformio run -e esp32dev
     platformio run -e esp32dev -t upload
 
 Usage:
@@ -10,7 +11,7 @@ Usage:
         Build + flash (recommended)
 
     python flash_esp32.py --build-only
-        Only build firmware (no flashing)
+        Only build firmware (no flashing, no device required)
 
     python flash_esp32.py --port COM3
         Specify serial port manually
@@ -73,11 +74,7 @@ class PlatformIOFlasher:
     def __init__(self, port=None):
         self.root = Path(__file__).parent
         self.build = self.root / ".pio" / "build" / "esp32dev"
-
-        self.port = port or detect_port()
-        if not self.port:
-            log("No serial port detected. Use --port COMx", "ERROR")
-            sys.exit(1)
+        self.port = port
 
         # Build artifacts
         self.bootloader = self.build / "bootloader.bin"
@@ -116,6 +113,14 @@ class PlatformIOFlasher:
 
     def flash(self):
         section("FLASH")
+
+        if not self.port:
+            self.port = detect_port()
+
+        if not self.port:
+            log("No serial port detected. Use --port COMx", "ERROR")
+            sys.exit(1)
+
         log("Flashing using PlatformIO upload sequence")
 
         cmd = [
@@ -154,6 +159,7 @@ def main():
     args = parser.parse_args()
 
     section("NEW FLASH SESSION")
+
     flasher = PlatformIOFlasher(port=args.port)
 
     flasher.build_firmware()
